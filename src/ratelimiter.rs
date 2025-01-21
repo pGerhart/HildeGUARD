@@ -5,7 +5,7 @@ use curve25519_dalek::scalar::{self, Scalar};
 use rand::rngs::OsRng;
 use std::collections::HashMap; // Import the trait for `identity()`
 pub struct RateLimiter {
-    secret_key: Scalar,                     // Secret key (private)
+    pub secret_key: Scalar,                 // Secret key (private)
     pub public_key: RistrettoPoint,         // Public key (G * secret_key)
     login_counters: HashMap<[u8; 32], u32>, // Nonce → login attempt count
 }

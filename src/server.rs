@@ -170,4 +170,31 @@ impl Server {
         // Step 5: Return `m`
         m
     }
+    /// Opt-out: Computes `H(password, n, 0)` and `M` by reversing encryption steps.
+    pub fn opt_out(
+        &self,
+        ratelimiter_secret_key: Scalar,
+        record: &EnrollmentRecord,
+    ) -> (RistrettoPoint, RistrettoPoint) {
+        // Step 1: Extract nonce `n`
+        let n = record.n;
+
+        // Step 3: Recover `y_0` using RateLimiter’s secret key
+        let y_0 = hash_y(&n, 0) * ratelimiter_secret_key;
+        let y_1 = hash_y(&n, 1) * ratelimiter_secret_key;
+
+        // Step 4: Recover `t_0` from the record
+        let (t_0, t_1) = record
+            .to_points()
+            .expect("Opt-out: Failed to recover points t_0 and t_1");
+
+        let x_0_inv = t_0 - y_0;
+        let x_0 = -x_0_inv;
+
+        // Step 6: Recover `M = t_1 + y_1`
+        let m = t_1 + y_1;
+
+        // Step 7: Return `H(password, n, 0)` and `M`
+        (x_0, m)
+    }
 }

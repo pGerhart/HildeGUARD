@@ -4,7 +4,7 @@ use rand::rngs::OsRng;
 use sha2::{Digest, Sha512};
 
 /// Struct representing a Schnorr proof
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Proof {
     c: Scalar,
     s: Scalar,

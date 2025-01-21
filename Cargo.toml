@@ -19,3 +19,21 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 bincode = "1.3"
 hex = "0.4"                                        # Ensures hex encoding is available
+
+criterion = "0.5"
+
+# Add this:
+[lib]
+name = "hildeguard"
+path = "src/lib.rs"
+
+[[bench]]
+name = "benchmark"
+harness = false    # Allows using `criterion`
+
+[profile.bench]
+inherits = "release"
+opt-level = 3        # Maximum optimizations
+debug = false        # Ensure no debug symbols
+lto = true           # Link Time Optimization
+codegen-units = 1    # Ensures better optimization at the cost of compile time
