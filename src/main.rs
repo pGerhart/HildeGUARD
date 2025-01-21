@@ -1,4 +1,5 @@
 mod enrollment_record;
+mod proofs;
 mod ratelimiter;
 mod server;
 mod utils;
