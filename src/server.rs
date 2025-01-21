@@ -1,5 +1,5 @@
 use crate::enrollment_record::EnrollmentRecord;
-use crate::utils::{compute_nonce, compute_x, sample_nonce};
+use crate::utils::{compute_nonce, compute_x, hash_blind, hash_final, sample_nonce};
 
 use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::aead::{Aead, KeyInit};
@@ -74,23 +74,78 @@ impl Server {
         y_0: RistrettoPoint,
         y_1: RistrettoPoint,
         nr: [u8; 32],
-        m: RistrettoPoint,
         ns: [u8; 32],
+        m: RistrettoPoint,
     ) -> EnrollmentRecord {
         // Step 1: Compute `n` as SHA-256(ns, nr)
         let n = compute_nonce(&ns, &nr);
 
         // Step 2: Compute `x_0` and `x_1` as Ristretto points
         let x_0 = compute_x(password, &n, 0);
-        let x_1 = compute_x(password, &n, 1);
 
         // Step 4: Compute `t_0` as `x_0^{-1} * y_0`
         let t_0 = y_0 - x_0;
 
         // Step 5: Compute `t_1` as `x_1^{-1} * y_1^{-1} * t_1`
-        let t_1 = m - x_1 - y_1;
+        let t_1 = m - y_1;
 
         EnrollmentRecord::new(t_0, t_1, n)
+    }
+
+    /// Initializes decryption
+    pub fn decrypt_init(
+        &self,
+        record: &EnrollmentRecord,
+        challenge_password: &str,
+    ) -> (RistrettoPoint, Scalar, [u8; 32]) {
+        // Step 1: Extract nonce `n` from the record
+        let n = record.n;
+
+        // Step 2: Compute `h_s_0` and `h_s_1`
+        let h_s_0 = compute_x(challenge_password, &n, 0);
+
+        let (t_0, _t_1) = record
+            .to_points()
+            .expect("Decrypt init: Failed to recover points t_0 and t_1");
+        // Step 3: Compute `h_r_0 = t_0 + h_s_0`
+        let h_r_0 = t_0 + h_s_0;
+
+        // Step 4: Compute `h_b = hash_blind(h_r_0)`
+        let h_b = hash_blind(&h_r_0);
+
+        // Step 5: Sample a random scalar `r_s`
+        let r_s = Scalar::random(&mut OsRng);
+
+        // Step 6: Compute `x = h_b ^ r_s`
+        let x = h_b * r_s;
+
+        // Step 6: Return `(x, r_s, n)`
+        (x, r_s, n)
+    }
+
+    /// Completes the decryption process
+    pub fn decrypt_finish(
+        &self,
+        y_1: RistrettoPoint,
+        y_2: RistrettoPoint,
+        r_s: Scalar,
+        record: &EnrollmentRecord,
+    ) -> (RistrettoPoint, RistrettoPoint) {
+        // Step 1: Compute `h_f = hash_final(y_1 * (-r_s))`
+        let h_f = hash_final(&(y_1 * (r_s.invert())));
+
+        // Step 2: Compute `h_r_1 = y_2 - h_f`
+        let h_r_1 = y_2 - h_f;
+
+        let (_t_0, t_1) = record
+            .to_points()
+            .expect("Decrypt init: Failed to recover points t_0 and t_1");
+
+        // Step 4: Compute `m = record.t_1 + h_s_1 + h_r_1`
+        let m = t_1 + h_r_1;
+
+        // Step 5: Return `m`
+        (m, h_f)
     }
 }
 

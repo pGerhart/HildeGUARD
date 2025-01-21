@@ -108,3 +108,21 @@ pub fn sample_nonce() -> [u8; 32] {
     OsRng.fill_bytes(&mut ns); // Fill ns with cryptographic random bytes
     ns
 }
+
+/// used for blinding during decryption
+pub fn hash_blind(point: &RistrettoPoint) -> RistrettoPoint {
+    hash_point(point)
+}
+
+/// used for blinding during decryption
+pub fn hash_final(point: &RistrettoPoint) -> RistrettoPoint {
+    hash_point(point)
+}
+
+/// Hashes a RistrettoPoint into another RistrettoPoint
+fn hash_point(point: &RistrettoPoint) -> RistrettoPoint {
+    let mut hasher = Sha512::new();
+    hasher.update(point.compress().as_bytes()); // Hash compressed bytes
+
+    RistrettoPoint::hash_from_bytes::<Sha512>(&hasher.finalize())
+}
