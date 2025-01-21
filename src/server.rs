@@ -1,6 +1,9 @@
 use crate::enrollment_record::EnrollmentRecord;
 use crate::proofs::Proof;
 use crate::utils::{compute_nonce, compute_x, hash_blind, hash_final, hash_y, sample_nonce};
+use std::sync::Arc;
+
+use tokio::sync::RwLock;
 
 use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::aead::{Aead, KeyInit};
@@ -16,7 +19,7 @@ use std::collections::HashMap; // Import the struct
 pub struct Server {
     secret_key: Aes256Gcm, // AES-GCM encryption key
     ratelimiter_public_key: RistrettoPoint,
-    records: HashMap<String, Vec<u8>>, // username → Encrypted record
+    records: Arc<RwLock<HashMap<[u8; 32], Vec<u8>>>>, // Thread-safe storage
 }
 
 impl Server {
@@ -29,13 +32,27 @@ impl Server {
 
         Self {
             secret_key,
-            records: HashMap::new(),
+            records: Arc::new(RwLock::new(HashMap::new())), // Thread-safe records
             ratelimiter_public_key: ratelimiter_public_key,
         }
     }
+    /// Store an enrollment record into the server
+    pub async fn store_enrollment_record(&self, record: EnrollmentRecord) {
+        let encrypted_record = self.encrypt_record(&record);
+        let mut records = self.records.write().await; // Acquire write lock
+        records.insert(record.n, encrypted_record);
+    }
+
+    /// Retrieve an enrollment record by username
+    pub async fn get_enrollment_record(&self, nonce: &[u8; 32]) -> Option<EnrollmentRecord> {
+        let records = self.records.read().await; // Acquire read lock
+        let encrypted_record = records.get(nonce)?;
+        self.decrypt_record(encrypted_record, nonce)
+    }
+
     /// Encrypt an enrollment record before storing it
-    fn encrypt_record(&self, record: &EnrollmentRecord, username: &str) -> Vec<u8> {
-        let nonce = Sha256::digest(username.as_bytes()); // Derive nonce from username
+    fn encrypt_record(&self, record: &EnrollmentRecord) -> Vec<u8> {
+        let nonce = Sha256::digest(record.n); // Derive nonce from username
         let nonce = GenericArray::from_slice(&nonce[..12]); // AES-GCM requires a 12-byte nonce
 
         let serialized_record = bincode::serialize(record).expect("Failed to serialize");
@@ -45,18 +62,12 @@ impl Server {
     }
 
     /// Decrypt an enrollment record when retrieving
-    fn decrypt_record(&self, encrypted_data: &[u8], username: &str) -> Option<EnrollmentRecord> {
-        let nonce = Sha256::digest(username.as_bytes()); // Derive nonce from username
+    fn decrypt_record(&self, encrypted_data: &[u8], nonce: &[u8; 32]) -> Option<EnrollmentRecord> {
+        let nonce = Sha256::digest(nonce); // Derive nonce from username
         let nonce = GenericArray::from_slice(&nonce[..12]);
 
         let decrypted_bytes = self.secret_key.decrypt(nonce, encrypted_data).ok()?;
         bincode::deserialize(&decrypted_bytes).ok()
-    }
-    /// Retrieve and decrypt an enrollment record by username
-    pub fn get_record(&self, username: &str) -> Option<EnrollmentRecord> {
-        self.records
-            .get(username)
-            .and_then(|enc| self.decrypt_record(enc, username))
     }
 
     /// Initialize enrollment: generate random nonce, create record, return it
