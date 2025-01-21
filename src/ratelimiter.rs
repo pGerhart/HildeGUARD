@@ -1,3 +1,4 @@
+use crate::proofs::Proof;
 use crate::utils::{compute_nonce, hash_blind, hash_final, hash_y, sample_nonce};
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::{self, Scalar};
@@ -5,7 +6,7 @@ use rand::rngs::OsRng;
 use std::collections::HashMap; // Import the trait for `identity()`
 pub struct RateLimiter {
     secret_key: Scalar,                     // Secret key (private)
-    public_key: RistrettoPoint,             // Public key (G * secret_key)
+    pub public_key: RistrettoPoint,         // Public key (G * secret_key)
     login_counters: HashMap<[u8; 32], u32>, // Nonce → login attempt count
 }
 
@@ -33,7 +34,15 @@ impl RateLimiter {
         *self.login_counters.get(&nonce).unwrap_or(&0)
     }
 
-    fn compute_prfs(&self, nonce: [u8; 32]) -> (RistrettoPoint, RistrettoPoint) {
+    fn compute_prfs(
+        &self,
+        nonce: [u8; 32],
+    ) -> (
+        RistrettoPoint,
+        RistrettoPoint,
+        RistrettoPoint,
+        RistrettoPoint,
+    ) {
         // Step 3: Compute `y_0` and `y_1`
         let hash_0 = hash_y(&nonce, 0);
         let hash_1 = hash_y(&nonce, 1);
@@ -41,21 +50,28 @@ impl RateLimiter {
         let y_0 = hash_0 * self.secret_key; // y_0 = hash(n, 0)^skr
         let y_1 = hash_1 * self.secret_key; // y_1 = hash(n, 1)^skr
 
-        (y_0, y_1)
+        (y_0, hash_0, y_1, hash_1)
     }
 
     /// Initialize enrollment: computes `y_0`, `y_1`, and `nr`
-    pub fn enroll(&self, ns: [u8; 32]) -> (RistrettoPoint, RistrettoPoint, [u8; 32]) {
+    pub fn encrypt(&self, ns: [u8; 32]) -> (RistrettoPoint, RistrettoPoint, Proof, [u8; 32]) {
         // Step 1: Sample a random nonce `nr`
         let nr = sample_nonce();
 
         // Step 2: Compute final nonce `n`
         let n = compute_nonce(&ns, &nr);
 
-        let (y_0, y_1) = self.compute_prfs(n);
+        let (y_0, hash_0, y_1, hash_1) = self.compute_prfs(n);
+
+        let proof = Proof::proof(
+            self.secret_key,
+            self.public_key,
+            &[hash_0, hash_1],
+            &[y_0, y_1],
+        );
 
         // Step 4: Return computed values
-        (y_0, y_1, nr)
+        (y_0, y_1, proof, nr)
     }
 
     pub fn decrypt(
@@ -64,7 +80,7 @@ impl RateLimiter {
         n: [u8; 32],
     ) -> (RistrettoPoint, RistrettoPoint, RistrettoPoint, Scalar) {
         // Step 1: Compute `h_r_0` and `h_r_1` from `n` using the PRF
-        let (h_r_0, h_r_1) = self.compute_prfs(n);
+        let (h_r_0, _hash_0, h_r_1, _hash_1) = self.compute_prfs(n);
 
         // Step 2: Compute `h_b` as a blind hash of `h_r_0`
         let h_b = hash_blind(&h_r_0);

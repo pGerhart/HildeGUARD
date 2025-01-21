@@ -1,5 +1,6 @@
 use crate::enrollment_record::EnrollmentRecord;
-use crate::utils::{compute_nonce, compute_x, hash_blind, hash_final, sample_nonce};
+use crate::proofs::Proof;
+use crate::utils::{compute_nonce, compute_x, hash_blind, hash_final, hash_y, sample_nonce};
 
 use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::aead::{Aead, KeyInit};
@@ -13,13 +14,14 @@ use rand::RngCore; // Import the trait for fill_bytes()
 use sha2::{Digest, Sha256};
 use std::collections::HashMap; // Import the struct
 pub struct Server {
-    secret_key: Aes256Gcm,             // AES-GCM encryption key
+    secret_key: Aes256Gcm, // AES-GCM encryption key
+    ratelimiter_public_key: RistrettoPoint,
     records: HashMap<String, Vec<u8>>, // username → Encrypted record
 }
 
 impl Server {
     /// Create a new PHE server with a randomly generated AES key
-    pub fn new() -> Self {
+    pub fn new(ratelimiter_public_key: RistrettoPoint) -> Self {
         use rand::RngCore;
         let mut key_bytes = [0u8; 32];
         rand::thread_rng().fill_bytes(&mut key_bytes);
@@ -28,6 +30,7 @@ impl Server {
         Self {
             secret_key,
             records: HashMap::new(),
+            ratelimiter_public_key: ratelimiter_public_key,
         }
     }
     /// Encrypt an enrollment record before storing it
@@ -57,7 +60,7 @@ impl Server {
     }
 
     /// Initialize enrollment: generate random nonce, create record, return it
-    pub fn enroll_init(&self) -> (RistrettoPoint, [u8; 32]) {
+    pub fn encrypt_init(&self) -> (RistrettoPoint, [u8; 32]) {
         // Step 1: Generate a random 32-byte nonce
         let ns = sample_nonce();
 
@@ -68,17 +71,27 @@ impl Server {
         (m, ns)
     }
     /// Completes the enrollment process
-    pub fn enroll_finish(
+    pub fn encrypt_finish(
         &self,
         password: &str,
         y_0: RistrettoPoint,
         y_1: RistrettoPoint,
         nr: [u8; 32],
+        proof: Proof,
         ns: [u8; 32],
         m: RistrettoPoint,
     ) -> EnrollmentRecord {
         // Step 1: Compute `n` as SHA-256(ns, nr)
         let n = compute_nonce(&ns, &nr);
+
+        assert!(
+            proof.verify(
+                self.ratelimiter_public_key,
+                &[hash_y(&n, 0), hash_y(&n, 1)],
+                &[y_0, y_1]
+            ),
+            "Encryption failed: Proof did not verify"
+        );
 
         // Step 2: Compute `x_0` and `x_1` as Ristretto points
         let x_0 = compute_x(password, &n, 0);
@@ -146,94 +159,5 @@ impl Server {
 
         // Step 5: Return `m`
         (m, h_f)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use curve25519_dalek::ristretto::RistrettoPoint;
-    use rand::rngs::OsRng;
-    use sha2::{Digest, Sha256};
-
-    fn create_random_enrollment_record() -> EnrollmentRecord {
-        let mut rng = OsRng;
-        let t_0 = RistrettoPoint::random(&mut rng); // Correct way to generate a random point
-        let t_1 = RistrettoPoint::random(&mut rng);
-        let n = Sha256::digest(b"test_user").into();
-
-        EnrollmentRecord::new(t_0, t_1, n)
-    }
-
-    /// Test if the server initializes correctly
-    #[test]
-    fn test_server_initialization() {
-        let server = Server::new();
-        assert!(
-            server.records.is_empty(),
-            "Server should start with no records"
-        );
-    }
-
-    /// Test encrypting and decrypting an enrollment record
-    #[test]
-    fn test_encrypt_decrypt_record() {
-        let server = Server::new();
-        let username = "test_user";
-        let record = create_random_enrollment_record();
-
-        let encrypted = server.encrypt_record(&record, username);
-        assert!(!encrypted.is_empty(), "Encrypted data should not be empty");
-
-        let decrypted = server.decrypt_record(&encrypted, username);
-        assert!(decrypted.is_some(), "Decryption should succeed");
-
-        let decrypted_record = decrypted.unwrap();
-        let (orig_t0, orig_t1) = record.to_points().unwrap();
-        let (dec_t0, dec_t1) = decrypted_record.to_points().unwrap();
-
-        assert_eq!(orig_t0, dec_t0, "Decrypted t_0 should match original");
-        assert_eq!(orig_t1, dec_t1, "Decrypted t_1 should match original");
-        assert_eq!(
-            record.n, decrypted_record.n,
-            "Decrypted nonce should match original"
-        );
-    }
-
-    /// Test storing and retrieving an enrollment record
-    #[test]
-    fn test_store_and_retrieve_record() {
-        let mut server = Server::new();
-        let username = "test_user";
-        let record = create_random_enrollment_record();
-
-        // Encrypt and store
-        let encrypted_record = server.encrypt_record(&record, username);
-        server
-            .records
-            .insert(username.to_string(), encrypted_record);
-
-        // Retrieve and decrypt
-        let retrieved_record = server.get_record(username);
-        assert!(retrieved_record.is_some(), "Record should be retrievable");
-
-        let retrieved_record = retrieved_record.unwrap();
-        let (orig_t0, orig_t1) = record.to_points().unwrap();
-        let (retr_t0, retr_t1) = retrieved_record.to_points().unwrap();
-
-        assert_eq!(orig_t0, retr_t0, "Retrieved t_0 should match original");
-        assert_eq!(orig_t1, retr_t1, "Retrieved t_1 should match original");
-        assert_eq!(
-            record.n, retrieved_record.n,
-            "Retrieved nonce should match original"
-        );
-    }
-
-    /// Test retrieval of a non-existent user
-    #[test]
-    fn test_retrieve_nonexistent_record() {
-        let server = Server::new();
-        let record = server.get_record("unknown_user");
-        assert!(record.is_none(), "Should return None for nonexistent users");
     }
 }

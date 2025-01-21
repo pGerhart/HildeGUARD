@@ -11,20 +11,20 @@ use utils::{compute_nonce, compute_x, hash_blind};
 
 fn main() {
     // Step 1: Initialize the Server and RateLimiter
-    let server = Server::new();
     let ratelimiter = RateLimiter::new();
+    let server = Server::new(ratelimiter.public_key);
 
     // Step 2: Run `enroll_init` on the Server
     let password = "securepassword";
-    let (m, ns) = server.enroll_init();
+    let (m, ns) = server.encrypt_init();
     println!("Server generated nonce: {:?}", encode(ns));
 
     // Step 3: Forward `ns` to the RateLimiter
-    let (y_0, y_1, nr) = ratelimiter.enroll(ns);
+    let (y_0, y_1, encrypt_proof, nr) = ratelimiter.encrypt(ns);
     println!("RateLimiter returned y_0, y_1 and nonce nr");
 
     // Step 4: The Server runs `enroll_finish`
-    let final_record = server.enroll_finish(password, y_0, y_1, nr, ns, m);
+    let final_record = server.encrypt_finish(password, y_0, y_1, nr, encrypt_proof, ns, m);
 
     // running tests
     // Verify that compute_nonce(ns, nr) matches the stored nonce in the record
