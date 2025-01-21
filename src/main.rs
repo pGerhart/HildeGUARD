@@ -62,7 +62,7 @@ fn main() {
     println!("Server ran decrypt_init:"); // h_b = {:?}, r_s = {:?}", h_b, r_s);
 
     // Step 6: The RateLimiter calls `decrypt`
-    let (y_1_prime, y_2, h_f_r, r_r) = ratelimiter.decrypt(x, n);
+    let (y_1_prime, y_2, proof_decrypt, h_f_r, r_r) = ratelimiter.decrypt(x, n);
     println!("RateLimiter returned y_1' and y_2");
 
     // ✅ Check if `y_1' == y_1 * r_s * r_r`
@@ -73,7 +73,7 @@ fn main() {
     }
 
     // Step 7: The Server calls `decrypt_finish`
-    let (m_prime, h_f_s) = server.decrypt_finish(y_1_prime, y_2, r_s, &final_record);
+    let (m_prime, h_f_s) = server.decrypt_finish(y_1_prime, y_2, proof_decrypt, r_s, &final_record);
     println!("Server ran decrypt_finish, obtained m'");
 
     // ✅ Check if `h_f_r` from RateLimiter matches `h_f_s` from Server

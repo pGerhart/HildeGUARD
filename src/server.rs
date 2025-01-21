@@ -141,6 +141,7 @@ impl Server {
         &self,
         y_1: RistrettoPoint,
         y_2: RistrettoPoint,
+        proof: Proof,
         r_s: Scalar,
         record: &EnrollmentRecord,
     ) -> (RistrettoPoint, RistrettoPoint) {
@@ -156,6 +157,15 @@ impl Server {
 
         // Step 4: Compute `m = record.t_1 + h_s_1 + h_r_1`
         let m = t_1 + h_r_1;
+
+        assert!(
+            proof.verify(
+                self.ratelimiter_public_key,
+                &[hash_y(&record.n, 1)],
+                &[h_r_1]
+            ),
+            "Encryption failed: Proof did not verify"
+        );
 
         // Step 5: Return `m`
         (m, h_f)

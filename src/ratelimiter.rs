@@ -78,9 +78,17 @@ impl RateLimiter {
         &self,
         x: RistrettoPoint,
         n: [u8; 32],
-    ) -> (RistrettoPoint, RistrettoPoint, RistrettoPoint, Scalar) {
+    ) -> (
+        RistrettoPoint,
+        RistrettoPoint,
+        Proof,
+        RistrettoPoint,
+        Scalar,
+    ) {
         // Step 1: Compute `h_r_0` and `h_r_1` from `n` using the PRF
-        let (h_r_0, _hash_0, h_r_1, _hash_1) = self.compute_prfs(n);
+        let (h_r_0, _hash_0, h_r_1, hash_1) = self.compute_prfs(n);
+
+        let proof = Proof::proof(self.secret_key, self.public_key, &[hash_1], &[h_r_1]);
 
         // Step 2: Compute `h_b` as a blind hash of `h_r_0`
         let h_b = hash_blind(&h_r_0);
@@ -96,6 +104,6 @@ impl RateLimiter {
         let y_2 = h_f + h_r_1;
 
         // Step 6: Return the computed `(y_1, y_2)`
-        (y_1, y_2, h_f, r_r)
+        (y_1, y_2, proof, h_f, r_r)
     }
 }
