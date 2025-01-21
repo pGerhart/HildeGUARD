@@ -78,13 +78,7 @@ impl RateLimiter {
         &self,
         x: RistrettoPoint,
         n: [u8; 32],
-    ) -> (
-        RistrettoPoint,
-        RistrettoPoint,
-        Proof,
-        RistrettoPoint,
-        Scalar,
-    ) {
+    ) -> (RistrettoPoint, RistrettoPoint, Proof) {
         // Step 1: Compute `h_r_0` and `h_r_1` from `n` using the PRF
         let (h_r_0, _hash_0, h_r_1, hash_1) = self.compute_prfs(n);
 
@@ -104,6 +98,6 @@ impl RateLimiter {
         let y_2 = h_f + h_r_1;
 
         // Step 6: Return the computed `(y_1, y_2)`
-        (y_1, y_2, proof, h_f, r_r)
+        (y_1, y_2, proof)
     }
 }

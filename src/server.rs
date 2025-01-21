@@ -110,7 +110,7 @@ impl Server {
         &self,
         record: &EnrollmentRecord,
         challenge_password: &str,
-    ) -> (RistrettoPoint, Scalar, [u8; 32]) {
+    ) -> (RistrettoPoint, Scalar) {
         // Step 1: Extract nonce `n` from the record
         let n = record.n;
 
@@ -133,7 +133,7 @@ impl Server {
         let x = h_b * r_s;
 
         // Step 6: Return `(x, r_s, n)`
-        (x, r_s, n)
+        (x, r_s)
     }
 
     /// Completes the decryption process
@@ -144,7 +144,7 @@ impl Server {
         proof: Proof,
         r_s: Scalar,
         record: &EnrollmentRecord,
-    ) -> (RistrettoPoint, RistrettoPoint) {
+    ) -> (RistrettoPoint) {
         // Step 1: Compute `h_f = hash_final(y_1 * (-r_s))`
         let h_f = hash_final(&(y_1 * (r_s.invert())));
 
@@ -168,6 +168,6 @@ impl Server {
         );
 
         // Step 5: Return `m`
-        (m, h_f)
+        m
     }
 }
