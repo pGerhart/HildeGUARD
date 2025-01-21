@@ -59,6 +59,11 @@ fn bench_encrypt_decrypt(c: &mut Criterion) {
             black_box(server.decrypt_finish(y_1_prime, y_2, proof_decrypt, r_s, &final_record));
         })
     });
+    group.bench_function("Opt-Out", |b| {
+        b.iter(|| {
+            black_box(server.opt_out(ratelimiter.secret_key, &final_record));
+        })
+    });
 
     group.finish();
 }
