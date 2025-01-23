@@ -1,7 +1,7 @@
-use crate::ratelimiter::RateLimiter;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use hex;
+use hildeguard::ratelimiter::RateLimiter;
 use serde::{Deserialize, Serialize};
 
 /// Structs for API serialization

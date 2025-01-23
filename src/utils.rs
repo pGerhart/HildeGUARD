@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 use curve25519_dalek::ristretto::RistrettoPoint;
-use curve25519_dalek::scalar::Scalar;
 use rand::rngs::OsRng;
 use rand::RngCore;
 use sha2::{Digest, Sha256, Sha512}; // Import the trait for `identity()` // Import the trait for fill_bytes()

@@ -1,10 +1,8 @@
-use crate::enrollment_record::EnrollmentRecord;
-use crate::proofs::Proof;
-use crate::ratelimiter::RateLimiter;
-use crate::server::Server;
-use crate::utils::compute_x;
 use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
+use hildeguard::enrollment_record::EnrollmentRecord;
+use hildeguard::proofs::Proof;
+use hildeguard::server::Server;
 
 use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]

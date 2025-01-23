@@ -10,7 +10,6 @@ use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::Aes256Gcm;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::Identity;
 use rand::rngs::OsRng; // Import the trait for `identity()`
 
 use rand::RngCore; // Import the trait for fill_bytes()
@@ -157,7 +156,7 @@ impl Server {
         proof: Proof,
         r_s: Scalar,
         record: &EnrollmentRecord,
-    ) -> (RistrettoPoint) {
+    ) -> RistrettoPoint {
         // Step 1: Compute `h_f = hash_final(y_1 * (-r_s))`
         let h_f = hash_final(&(y_1 * (r_s.invert())));
 

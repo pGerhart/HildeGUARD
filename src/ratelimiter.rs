@@ -1,7 +1,7 @@
 use crate::proofs::Proof;
 use crate::utils::{compute_nonce, hash_blind, hash_final, hash_y, sample_nonce};
 use curve25519_dalek::ristretto::RistrettoPoint;
-use curve25519_dalek::scalar::{self, Scalar};
+use curve25519_dalek::scalar::{Scalar};
 use rand::rngs::OsRng;
 use std::collections::HashMap; // Import the trait for `identity()`
 
