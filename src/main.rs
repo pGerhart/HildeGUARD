@@ -16,13 +16,9 @@ use utils::{compute_nonce, compute_x, hash_blind};
 const PASSWORD_COUNT: usize = 1_000_000;
 const PASSWORD_LENGTH: usize = 12;
 
-
-
-
 fn main() {
     enroll_and_verify();
 }
-
 
 fn generate_password() -> String {
     rand::thread_rng()
@@ -92,7 +88,6 @@ fn enroll_and_verify_hashed_passwords() {
         (verify_duration.as_secs_f64() * 1000.0) / PASSWORD_COUNT as f64
     );
 }
-
 
 fn full_run() {
     // Step 1: Initialize the Server and RateLimiter

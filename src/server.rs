@@ -16,6 +16,8 @@ use rand::rngs::OsRng; // Import the trait for `identity()`
 use rand::RngCore; // Import the trait for fill_bytes()
 use sha2::{Digest, Sha256};
 use std::collections::HashMap; // Import the struct
+
+#[derive(Clone)]
 pub struct Server {
     secret_key: Aes256Gcm, // AES-GCM encryption key
     ratelimiter_public_key: RistrettoPoint,

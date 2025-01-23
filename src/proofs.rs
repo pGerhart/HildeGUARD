@@ -91,6 +91,33 @@ impl Proof {
 
         Scalar::from_hash(hasher)
     }
+    /// Convert the proof to a 64-byte array
+    pub fn to_bytes(&self) -> [u8; 64] {
+        let mut bytes = [0u8; 64];
+        bytes[..32].copy_from_slice(&self.c.to_bytes());
+        bytes[32..].copy_from_slice(&self.s.to_bytes());
+        bytes
+    }
+
+    /// Construct a Proof from a 64-byte slice
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() != 64 {
+            return None; // Ensure input is exactly 64 bytes
+        }
+
+        let c = Scalar::from_bytes_mod_order(bytes[..32].try_into().unwrap());
+        let s = Scalar::from_bytes_mod_order(bytes[32..].try_into().unwrap());
+
+        Some(Proof { c, s })
+    }
+}
+
+/// Implement `AsRef<[u8]>` for hex encoding and serialization
+impl AsRef<[u8]> for Proof {
+    fn as_ref(&self) -> &[u8] {
+        let bytes = self.to_bytes(); // Store in a variable
+        Box::leak(Box::new(bytes)) // Convert to a 'static reference
+    }
 }
 
 #[cfg(test)]

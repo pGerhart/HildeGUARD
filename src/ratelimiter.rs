@@ -4,6 +4,8 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::{self, Scalar};
 use rand::rngs::OsRng;
 use std::collections::HashMap; // Import the trait for `identity()`
+
+#[derive(Clone)]
 pub struct RateLimiter {
     pub secret_key: Scalar,                 // Secret key (private)
     pub public_key: RistrettoPoint,         // Public key (G * secret_key)
