@@ -413,6 +413,7 @@ dependencies = [
  "curve25519-dalek",
  "hex",
  "rand",
+ "rayon",
  "serde",
  "serde_json",
  "sha2",

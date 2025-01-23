@@ -3,13 +3,98 @@ mod proofs;
 pub mod ratelimiter;
 pub mod server;
 pub mod utils;
+use rayon::prelude::*;
+use std::time::Instant; // Import Rayon for parallelism
 
 use hex::encode;
+use rand::{distributions::Alphanumeric, Rng};
 use ratelimiter::RateLimiter;
 use server::Server;
+use sha2::{Digest, Sha256};
 use utils::{compute_nonce, compute_x, hash_blind};
 
+const PASSWORD_COUNT: usize = 1_000_000;
+const PASSWORD_LENGTH: usize = 12;
+
+
+
+
 fn main() {
+    enroll_and_verify();
+}
+
+
+fn generate_password() -> String {
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(PASSWORD_LENGTH)
+        .map(char::from)
+        .collect()
+}
+
+fn hash_password(password: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(password.as_bytes());
+    encode(hasher.finalize()) // Convert to hex string
+}
+fn enroll_and_verify_hashed_passwords() {
+    let ratelimiter = RateLimiter::new();
+    let server = Server::new(ratelimiter.public_key);
+
+    // Step 1: Generate and hash passwords (without measuring time)
+    let passwords: Vec<String> = (0..PASSWORD_COUNT).map(|_| generate_password()).collect();
+    let hashed_passwords: Vec<String> = passwords.iter().map(|pw| hash_password(pw)).collect();
+
+    // Step 2: Encrypt all passwords in parallel and measure time
+    let start_encrypt = Instant::now();
+    let records: Vec<_> = hashed_passwords
+        .par_iter() // Rayon parallel iterator
+        .map(|hashed_password| {
+            let (m, ns) = server.encrypt_init();
+            let (y_0, y_1, encrypt_proof, nr) = ratelimiter.encrypt(ns);
+            let record = server.encrypt_finish(hashed_password, y_0, y_1, nr, encrypt_proof, ns, m);
+            (record, m, hashed_password.clone()) // Store record, message, and password
+        })
+        .collect();
+    let encrypt_duration = start_encrypt.elapsed();
+
+    // Step 3: Verify all passwords in parallel and measure time
+    let start_verify = Instant::now();
+    records.par_iter().for_each(|(record, m, hashed_password)| {
+        let (x, r_s) = server.decrypt_init(record, hashed_password);
+        let (y_1_prime, y_2, proof_decrypt) = ratelimiter.decrypt(x, record.n);
+        let m_prime = server.decrypt_finish(y_1_prime, y_2, proof_decrypt, r_s, record);
+
+        assert_eq!(
+            *m, m_prime,
+            "Decryption failed for password: {}",
+            hashed_password
+        );
+    });
+    let verify_duration = start_verify.elapsed();
+
+    // Print results
+    println!("Successfully enrolled and verified 1000 hashed passwords.");
+    println!(
+        "Parallel encryption time: {:.3?} seconds",
+        encrypt_duration.as_secs_f64()
+    );
+    println!(
+        "Average encryption time per password: {:.6?} ms",
+        (encrypt_duration.as_secs_f64() * 1000.0) / PASSWORD_COUNT as f64
+    );
+    println!(
+        "Parallel verification time: {:.3?} seconds",
+        verify_duration.as_secs_f64()
+    );
+    println!(
+        "Average verification time per password: {:.6?} ms",
+        (verify_duration.as_secs_f64() * 1000.0) / PASSWORD_COUNT as f64
+    );
+}
+
+
+fn full_run() {
     // Step 1: Initialize the Server and RateLimiter
     let ratelimiter = RateLimiter::new();
     let server = Server::new(ratelimiter.public_key);
