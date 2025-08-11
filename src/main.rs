@@ -17,7 +17,7 @@ const PASSWORD_COUNT: usize = 1_000_000;
 const PASSWORD_LENGTH: usize = 12;
 
 fn main() {
-    enroll_and_verify();
+    enroll_and_verify_hashed_passwords();
 }
 
 fn generate_password() -> String {
